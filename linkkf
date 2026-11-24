@@ -1,0 +1,76 @@
+const mangayomiSources = [{
+    "name": "linkkf",
+    "lang": "ko",
+    "baseUrl": "https://linkani.tv/",
+    "apiUrl": "",
+    "iconUrl": "",
+    "typeSource": "single",
+    "itemType": 1, // 0: 만화, 1: 애니(영상), 2: 소설
+    "isNsfw": true,
+    "version": "0.0.1",
+    "pkgPath": "anime/src/ko/linkkf.js"
+}];
+
+class DefaultExtension extends MProvider {
+    // 1. 인기 목록 불러오기
+    async getPopular(page) {
+        const res = await new Client().get(`${this.source.baseUrl}/popular?page=${page}`);
+        const doc = new Document(res.body);
+        const list = [];
+        
+        // HTML 요소에서 제목, 링크, 썸네일 추출 예시
+        for (const el of doc.select("div.item")) {
+            list.push({
+                name: el.selectFirst("h3.title").text,
+                link: el.selectFirst("a").attr("href"),
+                imageUrl: el.selectFirst("img").attr("src")
+            });
+        }
+        return { list, hasNextPage: true };
+    }
+
+    // 2. 최신 목록 불러오기
+    async getLatestUpdates(page) {
+        return await this.getPopular(page);
+    }
+
+    // 3. 검색 기능
+    async search(query, page, filters) {
+        const res = await new Client().get(`${this.source.baseUrl}/search?q=${query}&page=${page}`);
+        // 파싱 로직 구현 후 { list, hasNextPage } 반환
+        return { list: [], hasNextPage: false };
+    }
+
+    // 4. 상세 정보 및 에피소드(회차) 목록
+    async getDetail(url) {
+        const res = await new Client().get(url);
+        const doc = new Document(res.body);
+        const chapters = []; // 영상의 경우에도 에피소드 배열을 chapters 키로 반환
+        
+        for (const ep of doc.select("ul.episodes li")) {
+            chapters.push({
+                name: ep.selectFirst("a").text,
+                url: ep.selectFirst("a").attr("href")
+            });
+        }
+
+        return {
+            name: doc.selectFirst("h1").text,
+            imageUrl: doc.selectFirst("img.poster").attr("src"),
+            description: doc.selectFirst("p.desc").text,
+            status: 0, // 0: 연재중, 1: 완결
+            chapters: chapters
+        };
+    }
+
+    // 5. 영상 스트림 URL 추출 (itemType이 1일 때)
+    async getVideoList(url) {
+        const res = await new Client().get(url);
+        // API 응답이나 공개된 미디어 태그(<video src="...">)에서 직링크 추출
+        return [{
+            url: "https://example.com",
+            originalUrl: "https://example.com",
+            quality: "1080p"
+        }];
+    }
+}
